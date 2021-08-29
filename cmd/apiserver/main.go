@@ -23,8 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv := apiserver.NewApiServer(config)
-	if err := srv.Start(); err != nil {
+	if err := apiserver.Start(config); err != nil {
 		log.Fatal(err)
 	}
 

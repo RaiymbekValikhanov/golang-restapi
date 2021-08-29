@@ -1,21 +1,33 @@
-package store
+package sqlstore
 
-import "github.com/RaiymbekValikhanov/golang-restapi/internal/app/model"
+import (
+	"database/sql"
+
+	"github.com/RaiymbekValikhanov/golang-restapi/internal/app/model"
+	"github.com/RaiymbekValikhanov/golang-restapi/internal/app/store"
+)
 
 type UserRepository struct {
 	store *Store
 }
 
-func (r *UserRepository) Create(u *model.User) (*model.User, error) {
+func (r *UserRepository) Create(u *model.User) error {
+	if err := u.Validate(); err != nil {
+		return err
+	}
+	
+	if err := u.BeforeCreate(); err != nil {
+		return err
+	}
 
 	if err := r.store.db.QueryRow(
 		"INSERT INTO users (email, encrypted_password) VALUES ($1, $2) RETURNING id",
 		u.Email, u.EncryptedPassword,
 	).Scan(&u.ID); err != nil {
-		return nil, err
+		return err
 	}
 
-	return u, nil
+	return nil
 }
 
 func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
@@ -28,6 +40,10 @@ func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 		&u.Email,
 		&u.EncryptedPassword,
 	); err != nil {
+		if err == sql.ErrNoRows {
+			err = store.ErrRecordNotFound
+		}
+		
 		return nil, err
 	}
 
