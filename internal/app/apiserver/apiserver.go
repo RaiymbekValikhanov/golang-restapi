@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/RaiymbekValikhanov/golang-restapi/internal/app/store/sqlstore"
+	"github.com/gorilla/sessions"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,7 +18,8 @@ func Start(config *Config) error {
 	defer db.Close()
 
 	store := sqlstore.NewStore(db)
-	srv := NewServer(store)
+	sessionStore := sessions.NewCookieStore([]byte(config.SessionKey))
+	srv := NewServer(store, sessionStore)
 
 	loglevel, err := logrus.ParseLevel(config.LogLevel)
 	if err != nil {
