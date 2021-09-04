@@ -3,12 +3,16 @@ package apiserver
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+
+	// fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/RaiymbekValikhanov/golang-restapi/internal/app/model"
 	"github.com/RaiymbekValikhanov/golang-restapi/internal/app/store/teststore"
+	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/stretchr/testify/assert"
 )
@@ -91,7 +95,6 @@ func TestServer_HandleSessionCreate(t *testing.T) {
 			},
 			statusCode: http.StatusUnauthorized,
 		},
-
 	}
 
 	for _, tc := range testCases {
@@ -105,4 +108,49 @@ func TestServer_HandleSessionCreate(t *testing.T) {
 			assert.Equal(t, tc.statusCode, rec.Code)
 		})
 	}
+	
 }
+
+func TestServer_AuthenticateUser(t *testing.T) {
+	store := teststore.NewStore()
+	u := model.TestUser(t)
+	store.User().Create(u)
+
+	testCases := []struct {
+		name        string
+		cookieValue map[interface{}]interface{}
+		statusCode  int
+	}{
+		{
+			name: "valid",
+			cookieValue: map[interface{}]interface{}{
+				"user_id": u.ID,
+			},
+			statusCode: http.StatusOK,
+		}, 
+		{
+			name: "no auth",
+			cookieValue: nil,
+			statusCode: http.StatusUnauthorized,
+		},
+	}
+
+	
+	s := NewServer(store, sessions.NewCookieStore([]byte("secret")))
+	sc := securecookie.New([]byte("secret"), nil)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodPost, "/", nil)
+			cookieStr, _ := sc.Encode(sessionName, tc.cookieValue)
+			req.Header.Set("Cookie", fmt.Sprintf("%s=%s", sessionName, cookieStr))
+			s.authenticateUser(handler).ServeHTTP(rec, req)
+			assert.Equal(t, tc.statusCode, rec.Code)
+		})
+	}
+}
+
